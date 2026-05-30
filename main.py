@@ -10,11 +10,10 @@ bot = commands.Bot(
     intents=intents,
     help_command=None
 )
-
 async def load_cogs():
-    for filename in os.listdir("./cogs"):
+    for filename in os.listdir("./nanomango/cogs"):
         if filename.endswith(".py"):
-            await bot.load_extension(f"cogs.{filename[:-3]}")
+            await bot.load_extension(f"nanomango.cogs.{filename[:-3]}")
             print(f"Loaded {filename}")
 
 @bot.event
