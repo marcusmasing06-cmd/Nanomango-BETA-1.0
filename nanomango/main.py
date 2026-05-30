@@ -34,7 +34,9 @@ async def on_message(message):
 async def main():
     async with bot:
         await load_cogs()
-        await bot.start("Bot_Token")
+import os
+await bot.start(os.getenv("DISCORD_TOKEN"))
 
+# For a normal python script do await bot.start("Bot_Token") instead of import os await bot.start(os.getenv("DISCORD_TOKEN"))
 asyncio.run(main())
 
