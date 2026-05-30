@@ -1,0 +1,28 @@
+{
+    "items": {
+        "cool_background": {
+            "type": "background",
+            "price": 250,
+            "file": "backgrounds/cool_background.png",
+            "description": "A cool tiled background."
+        },
+        "neon_grid": {
+            "type": "background",
+            "price": 400,
+            "file": "backgrounds/neon_grid.png",
+            "description": "Retro neon grid background."
+        },
+        "golden_frame": {
+            "type": "frame",
+            "price": 500,
+            "file": "frames/golden_frame.png",
+            "description": "A shiny golden frame."
+        },
+        "mango_badge": {
+            "type": "badge",
+            "price": 1000,
+            "file": "badges/mango_badge.png",
+            "description": "Official NanoMango badge."
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "enabled": true,
+    "bad_words": [],
+    "log_channel": null,
+    "features": {
+        "anti_spam": true,
+        "anti_link": true,
+        "anti_ghostping": true,
+        "anti_massmention": true,
+        "anti_emojispam": true,
+        "anti_caps": true,
+        "anti_attachmentspam": true,
+        "auto_slowmode": true
+    },
+    "limits": {
+        "massmention": 5,
+        "emojis": 10,
+        "caps": 20,
+        "attachments": 4
+    },
+    "strike_limits": {
+        "mute": 3,
+        "kick": 5,
+        "ban": 7
+    },
+    "strikes": {}
+}
