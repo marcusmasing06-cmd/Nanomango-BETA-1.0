@@ -1,75 +1,41 @@
 import discord
 from discord.ext import commands
-import json
-import os
-import time
 
-AFK_FILE = "afk.json"
-
-
-class AFKSystem(commands.Cog):
+class AFK(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.afk = {}  # {user_id: reason}
 
-        if not os.path.exists(AFK_FILE):
-            with open(AFK_FILE, "w") as f:
-                json.dump({}, f, indent=4)
-
-    # -----------------------------
-    # Load & Save
-    # -----------------------------
-    def load(self):
-        with open(AFK_FILE, "r") as f:
-            return json.load(f)
-
-    def save(self, data):
-        with open(AFK_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-
-    # -----------------------------
-    # Set AFK
-    # -----------------------------
     @commands.command()
     async def afk(self, ctx, *, reason="AFK"):
-        user_id = str(ctx.author.id)
-        data = self.load()
+        """Set yourself as AFK."""
+        self.afk[ctx.author.id] = reason
+        await ctx.send(f"{ctx.author.mention} is now AFK: {reason}")
 
-        data[user_id] = {
-            "reason": reason,
-            "time": int(time.time())
-        }
-
-        self.save(data)
-
-        await ctx.send(f"💤 {ctx.author.mention} is now AFK — **{reason}**")
-
-    # -----------------------------
-    # Remove AFK on message
-    # -----------------------------
     @commands.Cog.listener()
     async def on_message(self, message):
+        # Ignore bot messages
         if message.author.bot:
             return
 
-        user_id = str(message.author.id)
-        data = self.load()
+        # Ignore AFK command itself so it doesn't instantly remove AFK
+        if message.content.startswith("!afk"):
+            return
 
-        # If user was AFK, remove it
-        if user_id in data:
-            del data[user_id]
-            self.save(data)
-            await message.channel.send(f"👋 Welcome back, {message.author.mention}. AFK removed.")
+        # If user was AFK and sends a message → remove AFK
+        if message.author.id in self.afk:
+            del self.afk[message.author.id]
+            await message.channel.send(f"{message.author.mention}, welcome back")
 
-        # Check mentions
+        # If someone mentions an AFK user → notify
         if message.mentions:
             for user in message.mentions:
-                uid = str(user.id)
-                if uid in data:
-                    reason = data[uid]["reason"]
-                    await message.channel.send(
-                        f"💤 {user.mention} is AFK — **{reason}**"
-                    )
+                if user.id in self.afk:
+                    reason = self.afk[user.id]
+                    await message.channel.send(f"{user.name} is AFK: {reason}")
 
+        # Process commands AFTER AFK logic
+        await self.bot.process_commands(message)
 
 async def setup(bot):
-    await bot.add_cog(AFKSystem(bot))
+    await bot.add_cog(AFK(bot))
