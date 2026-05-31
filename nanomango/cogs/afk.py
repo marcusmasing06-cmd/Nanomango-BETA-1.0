@@ -18,7 +18,6 @@ class AFK(commands.Cog):
         if message.author.bot:
             return
 
-        # Ignore AFK command itself so it doesn't instantly remove AFK
         if message.content.startswith("!afk"):
             return
 
