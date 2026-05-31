@@ -6,19 +6,39 @@ from PIL import Image, ImageDraw, ImageFont
 import aiofiles
 import io
 
-LEVEL_FILE = "levels.json"
-ECON_FILE = "economy.json"
-COSMETICS_FILE = "cosmetics.json"
+# -----------------------------
+# Path setup (works on Railway)
+# -----------------------------
+# This file is: nanomango/cogs/leveling.py
+# BASE_DIR = nanomango/
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(BASE_DIR)  # repo root
+
+LEVEL_FILE = os.path.join(BASE_DIR, "levels.json")
+ECON_FILE = os.path.join(BASE_DIR, "economy.json")
+COSMETICS_FILE = os.path.join(BASE_DIR, "cosmetics.json")
+COSMETICS_FOLDER = os.path.join(BASE_DIR, "cosmetics")
+FONT_PATH = os.path.join(ROOT_DIR, "arial.ttf")  # arial.ttf in repo root
 
 
 class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-        # Create levels.json if missing
+        # Ensure levels.json exists
         if not os.path.exists(LEVEL_FILE):
             with open(LEVEL_FILE, "w") as f:
                 json.dump({}, f)
+
+        # Ensure economy.json exists (so rank doesn't crash)
+        if not os.path.exists(ECON_FILE):
+            with open(ECON_FILE, "w") as f:
+                json.dump({}, f)
+
+        # Ensure cosmetics.json exists (basic structure)
+        if not os.path.exists(COSMETICS_FILE):
+            with open(COSMETICS_FILE, "w") as f:
+                json.dump({"items": {}}, f)
 
     # -----------------------------
     # Load & Save
@@ -40,8 +60,8 @@ class Leveling(commands.Cog):
         if message.author.bot:
             return
 
-        user_id = str(message.author.id)
         data = await self.load_data()
+        user_id = str(message.author.id)
 
         if user_id not in data:
             data[user_id] = {"xp": 0, "level": 1}
@@ -80,15 +100,22 @@ class Leveling(commands.Cog):
         img = Image.new("RGBA", (width, height), (18, 18, 18, 255))
         draw = ImageDraw.Draw(img)
 
-        # Load cosmetics
-        with open(ECON_FILE, "r") as f:
-            econ = json.load(f)
+        # Load economy + cosmetics safely
+        try:
+            with open(ECON_FILE, "r") as f:
+                econ = json.load(f)
+        except:
+            econ = {}
 
-        with open(COSMETICS_FILE, "r") as f:
-            cos = json.load(f)["items"]
+        try:
+            with open(COSMETICS_FILE, "r") as f:
+                cos_root = json.load(f)
+                cos = cos_root.get("items", {})
+        except:
+            cos = {}
 
         user_id = str(member.id)
-        equipped = econ[user_id].get("equipped", {
+        equipped = econ.get(user_id, {}).get("equipped", {
             "background": None,
             "frame": None,
             "badges": []
@@ -99,7 +126,7 @@ class Leveling(commands.Cog):
         # -----------------------------
         bg_name = equipped.get("background")
         if bg_name and bg_name in cos:
-            bg_path = os.path.join("cosmetics", cos[bg_name]["file"])
+            bg_path = os.path.join(COSMETICS_FOLDER, cos[bg_name]["file"])
             if os.path.exists(bg_path):
                 bg_img = Image.open(bg_path).convert("RGBA")
                 bw, bh = bg_img.size
@@ -116,11 +143,17 @@ class Leveling(commands.Cog):
         text_white = (255, 255, 255)
         text_gray = (180, 180, 180)
 
-        # Fonts
-        font_big = ImageFont.truetype("arial.ttf", 42)
-        font_small = ImageFont.truetype("arial.ttf", 28)
-        font_tiny = ImageFont.truetype("arial.ttf", 22)
-        wm_font = ImageFont.truetype("arial.ttf", 26)
+        # Fonts (fallback if font missing)
+        try:
+            font_big = ImageFont.truetype(FONT_PATH, 42)
+            font_small = ImageFont.truetype(FONT_PATH, 28)
+            font_tiny = ImageFont.truetype(FONT_PATH, 22)
+            wm_font = ImageFont.truetype(FONT_PATH, 26)
+        except:
+            font_big = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+            font_tiny = ImageFont.load_default()
+            wm_font = ImageFont.load_default()
 
         # Left stripe
         draw.rectangle([(0, 0), (25, height)], fill=mango_yellow)
@@ -170,7 +203,7 @@ class Leveling(commands.Cog):
         # Frame
         frame_name = equipped.get("frame")
         if frame_name and frame_name in cos:
-            frame_path = os.path.join("cosmetics", cos[frame_name]["file"])
+            frame_path = os.path.join(COSMETICS_FOLDER, cos[frame_name]["file"])
             if os.path.exists(frame_path):
                 frame_img = Image.open(frame_path).convert("RGBA")
                 frame_img = frame_img.resize(pfp_img.size)
@@ -186,7 +219,7 @@ class Leveling(commands.Cog):
         for badge_name in badges:
             if badge_name not in cos:
                 continue
-            badge_path = os.path.join("cosmetics", cos[badge_name]["file"])
+            badge_path = os.path.join(COSMETICS_FOLDER, cos[badge_name]["file"])
             if not os.path.exists(badge_path):
                 continue
 
@@ -233,16 +266,18 @@ class Leveling(commands.Cog):
         level = data[user_id]["level"]
         xp = data[user_id]["xp"]
 
-        # Fetch avatar
-        avatar = member.display_avatar.replace(size=256)
-        avatar_bytes = await avatar.read()
-        pfp = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-        pfp = pfp.resize((150, 150))
+        # Fetch avatar using helper
+        pfp = await self.fetch_pfp(member)
 
         img = self.generate_rank_card(member, level, xp, pfp, rank_position)
 
-        img.save("rank.png")
-        await ctx.send(file=discord.File("rank.png"))
+        # Save to bytes instead of disk (safer on Railway)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+
+        file = discord.File(buf, filename="rank.png")
+        await ctx.send(file=file)
 
     # -----------------------------
     # Leaderboard Command
