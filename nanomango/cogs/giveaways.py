@@ -32,7 +32,7 @@ class Giveaways(commands.Cog):
         return None
 
     # -----------------------------
-    # Start Giveaway (with countdown)
+    # Start Giveaway (smooth countdown)
     # -----------------------------
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -55,28 +55,38 @@ class Giveaways(commands.Cog):
         msg = await ctx.send(embed=embed)
         await msg.add_reaction("🎉")
 
-        # LIVE COUNTDOWN LOOP
+        # -----------------------------
+        # COUNTDOWN LOOP
+        # -----------------------------
+        last_display = None
+
         while True:
             remaining = int(end_time - asyncio.get_event_loop().time())
 
             if remaining <= 0:
                 break
 
-            embed.description = (
-                f"**Prize:** {prize}\n"
-                f"**Host:** {ctx.author.mention}\n"
-                f"**Ends in:** `{remaining}s`\n\n"
-                f"React with 🎉 to enter!"
-            )
+            # Only update when the number changes (prevents rate limits)
+            if remaining != last_display:
+                last_display = remaining
 
-            try:
-                await msg.edit(embed=embed)
-            except:
-                pass  # message deleted or missing perms
+                embed.description = (
+                    f"**Prize:** {prize}\n"
+                    f"**Host:** {ctx.author.mention}\n"
+                    f"**Ends in:** `{remaining}s`\n\n"
+                    f"React with 🎉 to enter!"
+                )
 
-            await asyncio.sleep(1)
+                try:
+                    await msg.edit(embed=embed)
+                except:
+                    pass  # ignore edit failures safely
 
-        # Fetch updated message
+            await asyncio.sleep(0.25)  # smooth updates without spamming
+
+        # -----------------------------
+        # PICK WINNER
+        # -----------------------------
         msg = await ctx.channel.fetch_message(msg.id)
         reaction = discord.utils.get(msg.reactions, emoji="🎉")
 
