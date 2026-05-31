@@ -32,11 +32,12 @@ class Giveaways(commands.Cog):
         return None
 
     # -----------------------------
-    # Start Giveaway (smooth countdown)
+    # Start Giveaway
     # -----------------------------
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def gstart(self, ctx, time: str, *, prize: str):
+        """Start a giveaway."""
         seconds = self.parse_time(time)
         if seconds is None:
             return await ctx.send("❌ Invalid time format. Use: `10s`, `5m`, `2h`, `3d`")
@@ -56,40 +57,38 @@ class Giveaways(commands.Cog):
         await msg.add_reaction("🎉")
 
         # -----------------------------
-        # COUNTDOWN LOOP
+        # SAFE COUNTDOWN LOOP
         # -----------------------------
-        last_display = None
-
         while True:
             remaining = int(end_time - asyncio.get_event_loop().time())
 
             if remaining <= 0:
                 break
 
-            # Only update when the number changes (prevents rate limits)
-            if remaining != last_display:
-                last_display = remaining
+            embed.description = (
+                f"**Prize:** {prize}\n"
+                f"**Host:** {ctx.author.mention}\n"
+                f"**Ends in:** `{remaining}s`\n\n"
+                f"React with 🎉 to enter!"
+            )
 
-                embed.description = (
-                    f"**Prize:** {prize}\n"
-                    f"**Host:** {ctx.author.mention}\n"
-                    f"**Ends in:** `{remaining}s`\n\n"
-                    f"React with 🎉 to enter!"
-                )
+            # Prevent crash at 1s
+            try:
+                await msg.edit(embed=embed)
+            except:
+                pass
 
-                try:
-                    await msg.edit(embed=embed)
-                except:
-                    pass  # ignore edit failures safely
-
-            await asyncio.sleep(0.25)  # smooth updates without spamming
+            await asyncio.sleep(1)
 
         # -----------------------------
         # PICK WINNER
         # -----------------------------
-        msg = await ctx.channel.fetch_message(msg.id)
-        reaction = discord.utils.get(msg.reactions, emoji="🎉")
+        try:
+            msg = await ctx.channel.fetch_message(msg.id)
+        except:
+            return await ctx.send("❌ Could not fetch giveaway message.")
 
+        reaction = discord.utils.get(msg.reactions, emoji="🎉")
         if not reaction:
             return await ctx.send("❌ No one reacted.")
 
@@ -112,6 +111,7 @@ class Giveaways(commands.Cog):
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def gend(self, ctx, message_id: int):
+        """End a giveaway early."""
         try:
             msg = await ctx.channel.fetch_message(message_id)
         except:
@@ -137,6 +137,7 @@ class Giveaways(commands.Cog):
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def greroll(self, ctx, message_id: int):
+        """Reroll a giveaway winner."""
         try:
             msg = await ctx.channel.fetch_message(message_id)
         except:
