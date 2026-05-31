@@ -32,7 +32,7 @@ class Giveaways(commands.Cog):
         return None
 
     # -----------------------------
-    # Start Giveaway
+    # Start Giveaway (with countdown)
     # -----------------------------
     @commands.command()
     @commands.has_permissions(manage_messages=True)
@@ -40,6 +40,8 @@ class Giveaways(commands.Cog):
         seconds = self.parse_time(time)
         if seconds is None:
             return await ctx.send("❌ Invalid time format. Use: `10s`, `5m`, `2h`, `3d`")
+
+        end_time = asyncio.get_event_loop().time() + seconds
 
         embed = discord.Embed(
             title="🎉 Giveaway Started!",
@@ -53,13 +55,37 @@ class Giveaways(commands.Cog):
         msg = await ctx.send(embed=embed)
         await msg.add_reaction("🎉")
 
-        await asyncio.sleep(seconds)
+        # LIVE COUNTDOWN LOOP
+        while True:
+            remaining = int(end_time - asyncio.get_event_loop().time())
+
+            if remaining <= 0:
+                break
+
+            embed.description = (
+                f"**Prize:** {prize}\n"
+                f"**Host:** {ctx.author.mention}\n"
+                f"**Ends in:** `{remaining}s`\n\n"
+                f"React with 🎉 to enter!"
+            )
+
+            try:
+                await msg.edit(embed=embed)
+            except:
+                pass  # message deleted or missing perms
+
+            await asyncio.sleep(1)
 
         # Fetch updated message
         msg = await ctx.channel.fetch_message(msg.id)
-        users = await msg.reactions[0].users().flatten()
+        reaction = discord.utils.get(msg.reactions, emoji="🎉")
 
-        # Remove bot from entries
+        if not reaction:
+            return await ctx.send("❌ No one reacted.")
+
+        users = await reaction.users().flatten()
+
+        # Remove bot
         if ctx.guild.me in users:
             users.remove(ctx.guild.me)
 
@@ -68,7 +94,7 @@ class Giveaways(commands.Cog):
 
         winner = random.choice(users)
 
-        await ctx.send(f"🎉 **Giveaway Ended!**\nWinner of **{prize}**: {winner.mention}")
+        await ctx.send(f"🎉 **Giveaway Ended!** Winner of **{prize}**: {winner.mention}")
 
     # -----------------------------
     # End Giveaway Early
@@ -80,9 +106,6 @@ class Giveaways(commands.Cog):
             msg = await ctx.channel.fetch_message(message_id)
         except:
             return await ctx.send("❌ Invalid message ID.")
-
-        if not msg.embeds:
-            return await ctx.send("❌ That message is not a giveaway.")
 
         reaction = discord.utils.get(msg.reactions, emoji="🎉")
         if not reaction:
