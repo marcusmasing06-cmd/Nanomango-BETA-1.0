@@ -69,9 +69,6 @@ class Leveling(commands.Cog):
 
         await self.save_data(data)
 
-        # ❌ DO NOT call process_commands here
-        # main.py handles it
-
     async def fetch_pfp(self, member):
         avatar = member.display_avatar.replace(size=256)
         data = await avatar.read()
