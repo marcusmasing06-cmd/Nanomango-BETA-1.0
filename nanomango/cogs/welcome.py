@@ -87,4 +87,26 @@ class WelcomeSystem(commands.Cog):
         if gid not in data:
             return
 
-        ch_id =
+        ch_id = data[gid].get("channel")
+        if not ch_id:
+            return
+
+        channel = member.guild.get_channel(ch_id)
+        if not channel:
+            return
+
+        msg = data[gid].get("message", "Welcome {user}!")
+        msg = msg.replace("{user}", member.mention)
+
+        embed = discord.Embed(
+            title="👋 Welcome!",
+            description=msg,
+            color=discord.Color.green()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+
+        await channel.send(embed=embed)
+
+
+async def setup(bot):
+    await bot.add_cog(WelcomeSystem(bot))
