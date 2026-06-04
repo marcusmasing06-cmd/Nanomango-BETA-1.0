@@ -13,7 +13,7 @@ class LevelRoles(commands.Cog):
         # Create file if missing
         if not os.path.exists(LEVELROLES_FILE):
             with open(LEVELROLES_FILE, "w") as f:
-                json.dump({"roles": {}}, f, indent=4)
+                json.dump({}, f, indent=4)
 
     # -----------------------------
     # Load & Save
@@ -27,6 +27,19 @@ class LevelRoles(commands.Cog):
             json.dump(data, f, indent=4)
 
     # -----------------------------
+    # Ensure guild exists
+    # -----------------------------
+    def ensure_guild(self, guild_id):
+        data = self.load()
+        gid = str(guild_id)
+
+        if gid not in data:
+            data[gid] = {"roles": {}}
+            self.save(data)
+
+        return data
+
+    # -----------------------------
     # Commands
     # -----------------------------
     @commands.group()
@@ -37,34 +50,38 @@ class LevelRoles(commands.Cog):
 
     @levelrole.command()
     async def add(self, ctx, level: int, role: discord.Role):
-        data = self.load()
-        data["roles"][str(level)] = role.id
+        data = self.ensure_guild(ctx.guild.id)
+        gid = str(ctx.guild.id)
+
+        data[gid]["roles"][str(level)] = role.id
         self.save(data)
 
         await ctx.send(f"✅ Users will now receive **{role.name}** at level **{level}**.")
 
     @levelrole.command()
     async def remove(self, ctx, level: int):
-        data = self.load()
+        data = self.ensure_guild(ctx.guild.id)
+        gid = str(ctx.guild.id)
 
-        if str(level) not in data["roles"]:
+        if str(level) not in data[gid]["roles"]:
             return await ctx.send("❌ No role is assigned to that level.")
 
-        del data["roles"][str(level)]
+        del data[gid]["roles"][str(level)]
         self.save(data)
 
         await ctx.send(f"🗑 Removed level role for level **{level}**.")
 
     @levelrole.command()
     async def list(self, ctx):
-        data = self.load()
-        roles = data["roles"]
+        data = self.ensure_guild(ctx.guild.id)
+        gid = str(ctx.guild.id)
+        roles = data[gid]["roles"]
 
         if not roles:
-            return await ctx.send("📭 No level roles set.")
+            return await ctx.send("📭 No level roles set for this server.")
 
         embed = discord.Embed(
-            title="🏅 Level Roles",
+            title=f"🏅 Level Roles for {ctx.guild.name}",
             color=discord.Color.gold()
         )
 
@@ -82,8 +99,9 @@ class LevelRoles(commands.Cog):
     # Level-Up Listener
     # -----------------------------
     async def give_level_role(self, member, new_level):
-        data = self.load()
-        roles = data["roles"]
+        data = self.ensure_guild(member.guild.id)
+        gid = str(member.guild.id)
+        roles = data[gid]["roles"]
 
         if str(new_level) not in roles:
             return
@@ -94,7 +112,7 @@ class LevelRoles(commands.Cog):
         if not role:
             return
 
-        # Remove older level roles
+        # Remove older level roles for this guild only
         for lvl, rid in roles.items():
             if lvl != str(new_level):
                 old_role = member.guild.get_role(rid)
@@ -114,3 +132,4 @@ class LevelRoles(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(LevelRoles(bot))
+    
